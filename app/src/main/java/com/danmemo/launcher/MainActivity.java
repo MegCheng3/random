@@ -55,7 +55,7 @@ public class MainActivity extends Activity {
     }
 
     void boot() {
-        web.loadData("<body style='background:#0B101E;color:#F2C46D;font-family:sans-serif;padding:32px'>"
+        web.loadDataWithBaseURL(null, "<body style='background:#0B101E;color:#F2C46D;font-family:sans-serif;padding:32px'>"
                 + "<h2>Starting server…</h2><p>If this stays here, open Termux once, run "
                 + "<code>sh ~/danmemo/install.sh</code> and set <code>allow-external-apps=true</code> in "
                 + "<code>~/.termux/termux.properties</code>.</p></body>", "text/html", "utf-8");
