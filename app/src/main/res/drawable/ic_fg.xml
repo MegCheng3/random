@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- gold ring -->
+    <path
+        android:fillColor="#F2C46D"
+        android:fillType="evenOdd"
+        android:pathData="M54,30 A24,24 0 1,0 54.01,30 Z M54,38 A16,16 0 1,1 53.99,38 Z" />
+    <!-- falna-blue centre -->
+    <path
+        android:fillColor="#8CC4FF"
+        android:pathData="M54,46 L62,54 L54,62 L46,54 Z" />
+</vector>
