@@ -10,13 +10,26 @@ android {
         applicationId 'com.danmemo.launcher'
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName '1.0'
+        versionCode 3
+        versionName '1.2'
     }
 
+    signingConfigs {
+        // One fixed key for every build, so a new APK installs over the old one (CI debug keys change on each run).
+        main {
+            storeFile file('danmemo.jks')
+            storePassword 'danmemore'
+            keyAlias 'danmemo'
+            keyPassword 'danmemore'
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.main
+        }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.main
         }
     }
     compileOptions {

@@ -28,9 +28,15 @@ public class MainActivity extends Activity {
     ValueCallback<Uri[]> picker;
     final Handler ui = new Handler(Looper.getMainLooper());
     boolean booting = false;
+    static volatile boolean visible = false;
+    boolean started = false;
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
+        try {
+            getWindow().setStatusBarColor(0xFF0B101E);
+            getWindow().setNavigationBarColor(0xFF0B101E);
+        } catch (Exception ignored) {}
         web = new WebView(this);
         setContentView(web);
         WebSettings s = web.getSettings();
@@ -61,10 +67,35 @@ public class MainActivity extends Activity {
                 try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(u))); } catch (Exception ignored) {}
             }
         });
-        if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(PERM) != PackageManager.PERMISSION_GRANTED) {
-            try { requestPermissions(new String[]{PERM}, 9); return; } catch (Exception ignored) {}
+        java.util.ArrayList<String> need = new java.util.ArrayList<>();
+        if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(PERM) != PackageManager.PERMISSION_GRANTED) need.add(PERM);
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED)
+            need.add("android.permission.POST_NOTIFICATIONS");
+        if (!need.isEmpty()) {
+            try { requestPermissions(need.toArray(new String[0]), 9); return; } catch (Exception ignored) {}
         }
         boot();
+    }
+
+    @Override protected void onStart() { super.onStart(); visible = true; }
+
+    /** Coming back to the app: if Android stopped Termux meanwhile, start the launcher again instead of showing a dead page. */
+    @Override protected void onResume() {
+        super.onResume();
+        if (!started || booting) return;
+        new Thread(() -> {
+            if (!alive()) ui.post(this::boot);
+        }).start();
+    }
+
+    @Override protected void onStop() { super.onStop(); visible = false; }
+
+    /** Watches in the background and sends a notification when the server is ready (only if the app is not on screen). */
+    void watch() {
+        try {
+            Intent i = new Intent(this, WatchService.class);
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(i); else startService(i);
+        } catch (Exception ignored) {}
     }
 
     @Override public void onRequestPermissionsResult(int code, String[] perms, int[] res) {
@@ -95,6 +126,8 @@ public class MainActivity extends Activity {
     void boot() {
         if (booting) return;
         booting = true;
+        started = true;
+        watch();
         page("Starting server…", "Please wait up to 30 seconds.", false);
         new Thread(() -> {
             String problem = null;
