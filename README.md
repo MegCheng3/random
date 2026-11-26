@@ -1,6 +1,6 @@
 # DanMemoRe Launcher APK (untested, best effort)
 
-Version 1.2: notification when the server is ready (asks for notification permission on first open); reopening the app restarts the launcher if Android stopped it; every build is signed with the key in app/danmemo.jks so a new APK installs over the old one. The first install of 1.2 still needs the old app uninstalled once.
+Version 1.3: a one-time setup screen (Copy setup line / Open Termux / Continue / Open F-Droid) shows when Termux is missing or the launcher cannot be reached; the setup line is in app/src/main/assets/setup-line.txt. Version 1.2: notification when the server is ready (asks for notification permission on first open); reopening the app restarts the launcher if Android stopped it; every build is signed with the key in app/danmemo.jks so a new APK installs over the old one. The first install of 1.2 still needs the old app uninstalled once.
 
 A thin app: it starts the Termux launcher and shows it full screen. The server itself still runs in Termux
 (embedding Python in an APK breaks the server's worker processes and openssl calls).

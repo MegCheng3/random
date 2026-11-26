@@ -8,6 +8,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.webkit.DownloadListener;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -15,6 +17,10 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import android.widget.Toast;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -30,6 +36,7 @@ public class MainActivity extends Activity {
     boolean booting = false;
     static volatile boolean visible = false;
     boolean started = false;
+    boolean termuxMissing = false;
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -47,6 +54,9 @@ public class MainActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView v, String url) {
                 if (url.startsWith("dm://retry")) { boot(); return true; }
                 if (url.startsWith("dm://termux")) { openTermux(); return true; }
+                if (url.startsWith("dm://continue")) { boot(); return true; }
+                if (url.startsWith("dm://copysetup")) { copySetup(); return true; }
+                if (url.startsWith("dm://fdroid")) { openFdroid(); return true; }
                 return false;
             }
         });
@@ -123,6 +133,59 @@ public class MainActivity extends Activity {
         web.loadDataWithBaseURL(null, h, "text/html", "utf-8", null);
     }
 
+    /** One-time setup screen: shown when Termux is missing or the launcher cannot be reached. */
+    void setupPage(String note, boolean termuxMissing) {
+        String btn = "display:inline-block;margin:6px 10px 6px 0;padding:12px 18px;border-radius:10px;"
+                + "background:#F2C46D;color:#0B101E;font-weight:bold;text-decoration:none";
+        String ghost = "display:inline-block;margin:6px 10px 6px 0;padding:12px 18px;border-radius:10px;"
+                + "border:1px solid #F2C46D;color:#F2C46D;font-weight:bold;text-decoration:none";
+        String li = "<li style=\"margin-bottom:10px\">";
+        String h = "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+                + "<body style=\"background:#0B101E;color:#F2C46D;font-family:sans-serif;padding:28px\">"
+                + "<h2>Set up DanMemoRe (one time, about 5 minutes)</h2>";
+        if (note != null && !note.isEmpty()) {
+            h += "<p style=\"color:#9AA3B8;font-size:14px;line-height:1.5\">" + esc(note) + "</p>";
+        }
+        h += "<p><a href='dm://copysetup' style=\"" + btn + "\">Copy setup line</a>"
+                + "<a href='dm://termux' style=\"" + ghost + "\">Open Termux</a>"
+                + "<a href='dm://continue' style=\"" + ghost + "\">" + (termuxMissing ? "Continue" : "Try again") + "</a>"
+                + (termuxMissing ? "<a href='dm://fdroid' style=\"" + ghost + "\">Open F-Droid</a>" : "") + "</p>"
+                + "<ol style=\"color:#E8E3D5;line-height:1.5;padding-left:20px\">"
+                + li + "<b>Install Termux</b> from F-Droid (tap Open F-Droid). The Play Store version is too old and won't work.</li>"
+                + li + "<b>Unzip <code>danmemo-android.zip</code> into your Downloads folder</b> with your Files app.</li>"
+                + li + "Tap <b>Copy setup line</b>, then <b>Open Termux</b>, long-press the black screen, tap <b>Paste</b>, then tap <b>Enter</b> on the keyboard."
+                + "<br>Tap <b>Allow</b> when Android asks about files. Wait until Termux shows <b>ALL SET. Go back to the DanMemoRe app now.</b>"
+                + " (the first time takes a few minutes while it downloads Python).</li>"
+                + li + "<b>Come back here</b> and tap <b>Continue</b>. If Android asks, allow <b>\"Run commands in Termux environment\"</b> for DanMemoRe.</li>"
+                + "</ol>"
+                + "<p style=\"color:#9AA3B8;font-size:14px;line-height:1.5\">From then on, just open the DanMemoRe app. "
+                + "Leave Termux in the background and set its battery use to Unrestricted so Android does not close it.<br>"
+                + "Something went wrong? Paste the same line again: it is safe to repeat.</p>"
+                + "</body>";
+        web.loadDataWithBaseURL(null, h, "text/html", "utf-8", null);
+    }
+
+    void copySetup() {
+        try {
+            BufferedReader r = new BufferedReader(new InputStreamReader(getAssets().open("setup-line.txt"), "UTF-8"));
+            StringBuilder b = new StringBuilder();
+            String line;
+            while ((line = r.readLine()) != null) b.append(line);
+            r.close();
+            ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(ClipData.newPlainText("DanMemoRe setup", b.toString().trim()));
+            Toast.makeText(this, "Setup line copied. Open Termux, long-press, Paste, Enter.", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(this, "Could not copy the setup line: " + e, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    void openFdroid() {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://f-droid.org/packages/com.termux/")));
+        } catch (Exception ignored) {}
+    }
+
     void boot() {
         if (booting) return;
         booting = true;
@@ -137,14 +200,13 @@ public class MainActivity extends Activity {
             }
             final boolean ok = alive();
             final String p = problem;
+            final boolean missing = termuxMissing;
             ui.post(() -> {
                 booting = false;
                 if (ok) web.loadUrl(URL);
-                else page("Launcher did not start",
-                        p != null ? p : "The request reached Termux but the launcher did not come up. "
-                                + "Check that install.sh finished, that ~/danmemo/start.sh exists, "
-                                + "and that allow-external-apps=true is in ~/.termux/termux.properties "
-                                + "(then fully close and reopen Termux once).", true);
+                else if (missing) setupPage(p, true);
+                else if (p != null) page("Launcher did not start", p, true);   // e.g. the "Run commands in Termux environment" permission is missing
+                else setupPage("The launcher did not come up. If you already ran the setup, wait a moment and tap Try again.", false);
             });
         }).start();
     }
@@ -168,9 +230,11 @@ public class MainActivity extends Activity {
 
     /** Returns null when the request was sent, else a readable reason. */
     String startTermux() {
+        termuxMissing = false;
         try {
             getPackageManager().getPackageInfo("com.termux", 0);
         } catch (Exception e) {
+            termuxMissing = true;
             return "Termux is not installed on this device. Install Termux from F-Droid, then run install.sh in it.";
         }
         if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(PERM) != PackageManager.PERMISSION_GRANTED) {
